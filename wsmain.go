@@ -32,11 +32,23 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	//
 	// Read query parameters
 	//
-	bunghole := r.FormValue("ARSE")
-	fmt.Printf("ARSE: '%s'\n", bunghole)
-	fields := r.FormValue("fields")
-	fmt.Printf("Fields: %s\n", fields)
+	err := r.ParseForm()
+	if err != nil	{
+		fmt.Printf("Failed to parse form\n")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
+	//
+	// "fields" parameter is an array
+	//
+	values := r.Form["fields"]
+	fmt.Printf("Request specifies '%d' fields\n", len(values))
+
+	if 0 < len(values) {
+		for index := 0; index < len(values); index++ {
+			fmt.Printf("Field %d: '%s'\n", index, values[index])
+		}
+	}
 
 
 	//
