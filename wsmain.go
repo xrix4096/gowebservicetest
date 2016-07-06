@@ -11,6 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+type analyticsResponse struct {
+	Name string
+	Time int64
+}
+
 //
 // main
 //
@@ -55,8 +60,39 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//
-	// S3
+	// Define response structure
 	//
+	myResponse := analyticsResponse{"ANiceResponse", 1234}
+
+	//
+	// Do some interacting with the S3 API
+	//
+	listS3Buckets(&myResponse)
+
+	//
+	// Add response headers
+	//
+	w.Header().Set("X-Clacks-Overhead", "GNU Terry Pratchett")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	//
+
+	// Send analyticsResponse as JSON
+	//
+	responseJSON, err := json.Marshal(myResponse)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write(responseJSON)
+
+}
+
+func listS3Buckets(response *analyticsResponse) {
+
+	response.Time++;
+
 	svc := s3.New(session.New(&aws.Config{Region: aws.String("us-west-2")}))
 	result, err := svc.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
@@ -68,33 +104,4 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	for _, bucket := range result.Buckets {
 		log.Printf("%s : %s\n", aws.StringValue(bucket.Name), bucket.CreationDate)
 	}
-
-
-
-
-
-	//
-	// Add response headers
-	//
-	w.Header().Set("X-Clacks-Overhead", "GNU Terry Pratchett")
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-
-	//
-	// Send JSON response
-	//
-	type analyticsResponse struct {
-		Name string
-		Time int64
-	}
-
-	myResponse := analyticsResponse{"ANiceResponse", 1294706395881547000}
-	responseJSON, err := json.Marshal(myResponse)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	w.Write(responseJSON)
-
 }
