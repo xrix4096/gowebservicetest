@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"net/http"
 	"runtime"
 	"encoding/json"
@@ -12,8 +13,14 @@ import (
 )
 
 type analyticsResponse struct {
-	Name string
-	Time int64
+	Name         string
+	DateStamp    time.Time
+	BucketList []bucketDescription
+}
+
+type bucketDescription struct {
+	Name          string
+	CreationDate *time.Time
 }
 
 //
@@ -62,7 +69,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	//
 	// Define response structure
 	//
-	myResponse := analyticsResponse{"ANiceResponse", 1234}
+	myResponse := analyticsResponse{"ANiceResponse", time.Now(), make([]bucketDescription, 0) }
 
 	//
 	// Do some interacting with the S3 API
@@ -91,17 +98,31 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 
 func listS3Buckets(response *analyticsResponse) {
 
-	response.Time++;
+	//
+	// @todo Find out how to specify credentials here rather than from global
+	// config
+	//
+	log.Printf("Creating session....")
+	mySession := session.New(&aws.Config{Region: aws.String("us-west-2")})
+	log.Printf("Connecting to S3....")
+	myS3svc := s3.New(mySession)
 
-	svc := s3.New(session.New(&aws.Config{Region: aws.String("us-west-2")}))
-	result, err := svc.ListBuckets(&s3.ListBucketsInput{})
+
+
+	log.Printf("Listing buckets....")
+	result, err := myS3svc.ListBuckets(&s3.ListBucketsInput{})
+
 	if err != nil {
 		log.Println("Failed to list buckets", err)
 		return
 	}
 
+
 	log.Println("Buckets:")
 	for _, bucket := range result.Buckets {
 		log.Printf("%s : %s\n", aws.StringValue(bucket.Name), bucket.CreationDate)
+		myBucket := bucketDescription{*bucket.Name, bucket.CreationDate}
+		response.BucketList = append(response.BucketList, myBucket)
+
 	}
 }
