@@ -92,7 +92,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	case analyticsModeListBuckets:
 		listBuckets(w, r)
 	case analyticsModeGetBucketInfo:
-		getBucketInfo(w, r)
+		getBucketInfo(w, r, bucketID)
 	case analyticsModeInvalid:
 		http.Error(w, "Unsupported path requested", 404)
 	}
@@ -190,7 +190,38 @@ func listS3Buckets(response *analyticsResponse) {
 	}
 }
 
-func getBucketInfo(w http.ResponseWriter, r *http.Request) {
+func listS3ObjectsInBucket(response *analyticsResponse, bucketID string) {
+
+	//
+	// @todo Find out how to specify credentials here rather than from global
+	// config
+	//
+	log.Printf("Creating session....")
+	mySession := session.New(&aws.Config{Region: aws.String("us-west-2")})
+	log.Printf("Connecting to S3....")
+	myS3svc := s3.New(mySession)
+
+	log.Printf("Listing objects in '%s'....", bucketID)
+
+	i := 0
+	err := myS3svc.ListObjectsPages(&s3.ListObjectsInput{
+		Bucket: &bucketID,
+	}, func(p *s3.ListObjectsOutput, last bool) (shouldContinue bool) {
+		fmt.Println("Page,", i)
+		i++
+
+		for _, obj := range p.Contents {
+			fmt.Println("Object:", *obj.Key)
+		}
+		return true
+	})
+
+	if err != nil {
+		fmt.Println("Failed to list objects\n", err)
+	}
+}
+
+func getBucketInfo(w http.ResponseWriter, r *http.Request, bucketID string) {
 	//
 	// Only supported method is GET
 	//
@@ -230,6 +261,7 @@ func getBucketInfo(w http.ResponseWriter, r *http.Request) {
 	//
 	// Do some interacting with the S3 API
 	//
+	listS3ObjectsInBucket(&myResponse, bucketID)
 
 	//
 	// Add response headers
