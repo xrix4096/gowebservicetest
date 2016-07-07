@@ -1,25 +1,32 @@
 package main
 
 import (
-	"fmt"
-	"time"
-	"net/http"
-	"runtime"
 	"encoding/json"
-	"log"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"log"
+	"net/http"
+	"runtime"
+	"strings"
+	"time"
+)
+
+const (
+	analyticsModeInvalid       = 0
+	analyticsModeListBuckets   = 100
+	analyticsModeGetBucketInfo = 200
 )
 
 type analyticsResponse struct {
-	Name         string
-	DateStamp    time.Time
+	Name       string
+	DateStamp  time.Time
 	BucketList []bucketDescription
 }
 
 type bucketDescription struct {
-	Name          string
+	Name         string
 	CreationDate *time.Time
 }
 
@@ -33,12 +40,39 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 
+func getModeFromURL(u string) (mode int, bucketID string) {
+	mode = analyticsModeInvalid
+
+	fmt.Printf("CP: getModeFromURL '%s'\n", u)
+	urlSplit := strings.Split(u, "/")
+	count := len(urlSplit)
+	fmt.Printf("CP: Have '%d' components in path\n", count)
+
+	for index, element := range urlSplit {
+		fmt.Printf("CP: %d -> '%s'\n", index, element)
+	}
+
+	if urlSplit[1] != "s3" || urlSplit[2] != "buckets" {
+		return analyticsModeInvalid, ""
+	}
+
+	if 3 == count {
+		mode = analyticsModeListBuckets
+		fmt.Printf("List buckets mode\n")
+	}
+	if 4 == count {
+		mode = analyticsModeGetBucketInfo
+		fmt.Printf("Bucket info mode\n")
+		bucketID = urlSplit[3]
+	}
+
+	return mode, bucketID
+}
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("bucketsRequestHandler:")
 	fmt.Printf("URL: %s\n", r.URL.String())
 	fmt.Printf("METHOD: %s\n", r.Method)
-
 
 	//
 	// Parse the URL to see what type of request we are making. To be valid
@@ -46,9 +80,26 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	// "/s3/buckets" to request a bucket list, or "/s3/buckets/<bucketid>"
 	// to request info on a particular bucket
 	//
+	analyticsMode, bucketID := getModeFromURL(r.URL.Path)
+	fmt.Printf("CP: Mode '%d' Bucket '%s'\n", analyticsMode, bucketID)
 
+	//
+	// Supported Modes:
+	//  analyticsModeListBuckets
+	//  analyticsModeGetBucketInfo
+	//
+	switch analyticsMode {
+	case analyticsModeListBuckets:
+		listBuckets(w, r)
+	case analyticsModeGetBucketInfo:
+		getBucketInfo(w, r)
+	case analyticsModeInvalid:
+		http.Error(w, "Unsupported path requested", 404)
+	}
 
+}
 
+func listBuckets(w http.ResponseWriter, r *http.Request) {
 	//
 	// Only supported method is GET
 	//
@@ -60,9 +111,10 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	// Read query parameters
 	//
 	err := r.ParseForm()
-	if err != nil	{
+	if err != nil {
 		fmt.Printf("Failed to parse form\n")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	//
@@ -80,7 +132,9 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	//
 	// Define response structure
 	//
-	myResponse := analyticsResponse{"ANiceResponse", time.Now(), make([]bucketDescription, 0) }
+	myResponse := analyticsResponse{"ListBuckets",
+		time.Now(),
+		make([]bucketDescription, 0)}
 
 	//
 	// Do some interacting with the S3 API
@@ -101,6 +155,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Write(responseJSON)
@@ -118,8 +173,6 @@ func listS3Buckets(response *analyticsResponse) {
 	log.Printf("Connecting to S3....")
 	myS3svc := s3.New(mySession)
 
-
-
 	log.Printf("Listing buckets....")
 	result, err := myS3svc.ListBuckets(&s3.ListBucketsInput{})
 
@@ -128,7 +181,6 @@ func listS3Buckets(response *analyticsResponse) {
 		return
 	}
 
-
 	log.Println("Buckets:")
 	for _, bucket := range result.Buckets {
 		log.Printf("%s : %s\n", aws.StringValue(bucket.Name), bucket.CreationDate)
@@ -136,4 +188,66 @@ func listS3Buckets(response *analyticsResponse) {
 		response.BucketList = append(response.BucketList, myBucket)
 
 	}
+}
+
+func getBucketInfo(w http.ResponseWriter, r *http.Request) {
+	//
+	// Only supported method is GET
+	//
+	if r.Method != "GET" {
+		http.Error(w, "Invalid request method", 405)
+	}
+
+	//
+	// Read query parameters
+	//
+	err := r.ParseForm()
+	if err != nil {
+		fmt.Printf("Failed to parse form\n")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// "fields" parameter is an array
+	//
+	values := r.Form["fields"]
+	fmt.Printf("Request specifies '%d' fields\n", len(values))
+
+	if 0 < len(values) {
+		for index := 0; index < len(values); index++ {
+			fmt.Printf("Field %d: '%s'\n", index, values[index])
+		}
+	}
+
+	//
+	// Define response structure
+	//
+	myResponse := analyticsResponse{"BucketInfo",
+		time.Now(),
+		make([]bucketDescription, 0)}
+
+	//
+	// Do some interacting with the S3 API
+	//
+
+	//
+	// Add response headers
+	//
+	w.Header().Set("X-Clacks-Overhead", "GNU Terry Pratchett")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	//
+
+	// Send analyticsResponse as JSON
+	//
+	responseJSON, err := json.Marshal(myResponse)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJSON)
+
 }
