@@ -29,14 +29,25 @@ type bucketDescription struct {
 func main() {
 	fmt.Printf("Initialising Boshing Sequence on %s....\n",
 		runtime.GOOS)
-	http.HandleFunc("/getanalytics", requestHandler)
+	http.HandleFunc("/", requestHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("bucketsRequestHandler:")
 	fmt.Printf("URL: %s\n", r.URL.String())
 	fmt.Printf("METHOD: %s\n", r.Method)
+
+
+	//
+	// Parse the URL to see what type of request we are making. To be valid
+	// the first part of the path must be "s3". Following that we may have
+	// "/s3/buckets" to request a bucket list, or "/s3/buckets/<bucketid>"
+	// to request info on a particular bucket
+	//
+
+
 
 	//
 	// Only supported method is GET
