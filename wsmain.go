@@ -197,7 +197,7 @@ func listS3ObjectsInBucket(response *analyticsResponse, bucketID string) {
 	// config
 	//
 	log.Printf("Creating session....")
-	mySession := session.New(&aws.Config{Region: aws.String("us-west-2")})
+	mySession := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	log.Printf("Connecting to S3....")
 	myS3svc := s3.New(mySession)
 
