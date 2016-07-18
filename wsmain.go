@@ -164,12 +164,14 @@ func listBuckets(w http.ResponseWriter, r *http.Request) {
 
 func listS3Buckets(response *analyticsResponse) {
 
+	disableSSL := true
+
 	//
 	// @todo Find out how to specify credentials here rather than from global
 	// config
 	//
 	log.Printf("Creating session....")
-	mySession := session.New(&aws.Config{Region: aws.String("us-west-2")})
+	mySession := session.New(&aws.Config{Region: aws.String("us-west-2"), DisableSSL: &disableSSL})
 	log.Printf("Connecting to S3....")
 	myS3svc := s3.New(mySession)
 
