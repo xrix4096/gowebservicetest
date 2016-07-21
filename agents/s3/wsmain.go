@@ -34,8 +34,10 @@ type bucketDescription struct {
 // main
 //
 func main() {
-	fmt.Printf("Initialising Boshing Sequence on %s....\n",
-		runtime.GOOS)
+	fmt.Printf("Running on %s....\n", runtime.GOOS)
+	fmt.Printf("Listening on :8080\n")
+	fmt.Print("Valid paths: /s3/buckets\n/s3/buckets/<bucketname>\n")
+
 	http.HandleFunc("/", requestHandler)
 	http.ListenAndServe(":8080", nil)
 }
