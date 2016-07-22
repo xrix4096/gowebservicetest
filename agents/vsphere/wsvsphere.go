@@ -10,6 +10,9 @@ import (
 	"github.com/vmware/govmomi/find"
 )
 
+//
+// Command line flags
+//
 var userFlag = flag.String("user", "default", "ESX / vCenter user")
 var pwFlag = flag.String("password", "", "ESX / vCenter password")
 var urlFlag = flag.String("url", "https://username:password@host/sdk",
@@ -44,11 +47,11 @@ func muckAbout() {
 	defer cancel()   // Execute on function completion
 
 	//
-	// @todo: Fetch following variables from CLI args or local config
+	// Fetch following variables from CLI args or local config
 	//
 	myUser := *userFlag
 	myPW := *pwFlag
-	myBaseURL := *urlFlag //"https://ukpvmvcd05.dsgdev.lab/sdk"
+	myBaseURL := *urlFlag
 
 	//
 	// Create full URL from the credentials, base and path
