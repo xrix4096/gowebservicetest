@@ -3,17 +3,28 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"flag"
 	"net/url"
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 )
 
+var userFlag = flag.String("user", "default", "ESX / vCenter user")
+var pwFlag = flag.String("password", "", "ESX / vCenter password")
+var urlFlag = flag.String("url", "https://username:password@host/sdk",
+	"ESX / vCenter URL")
 
 //
 // main
 //
 func main() {
+
+	//
+	// Process CLI arguments
+	//
+	flag.Parse()
+
 	fmt.Printf("Running on %s....\n", runtime.GOOS)
 
 	muckAbout()
@@ -35,9 +46,9 @@ func muckAbout() {
 	//
 	// @todo: Fetch following variables from CLI args or local config
 	//
-	myUser := "backup_user@vSphere.local"
-	myPW := "Binars1!"
-	myBaseURL := "https://ukpvmvcd05.dsgdev.lab/sdk"
+	myUser := *userFlag
+	myPW := *pwFlag
+	myBaseURL := *urlFlag //"https://ukpvmvcd05.dsgdev.lab/sdk"
 
 	//
 	// Create full URL from the credentials, base and path
