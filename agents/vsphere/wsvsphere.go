@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"flag"
+	"reflect"
 	"net/url"
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
@@ -17,6 +18,9 @@ var userFlag = flag.String("user", "default", "ESX / vCenter user")
 var pwFlag = flag.String("password", "", "ESX / vCenter password")
 var urlFlag = flag.String("url", "https://username:password@host/sdk",
 	"ESX / vCenter URL")
+var datacenterPath = flag.String("dcpath", "", "Path containing datacenter(s)")
+var jsonFlag = flag.Bool("dumpjson", false,
+	"Enable dump of client info as JSON")
 
 //
 // main
@@ -61,10 +65,9 @@ func muckAbout() {
 		fmt.Printf("Failed to parse base URL '%s': '%s'\n", myBaseURL, err)
 		return
 	}
-	fmt.Printf("CP: URL = '%s'\n", u.String())
 
 	u.User = url.UserPassword(myUser, myPW)
-	fmt.Printf("CP: URL = '%s'\n", u.String())
+	fmt.Printf("DEBUG: FullURL = '%s'\n", u.String())
 
 	//
 	// Try and connect to that vCenter
@@ -81,31 +84,38 @@ func muckAbout() {
 	//
 	// Dump some JSON info of the client
 	//
-	myJSON, err := myClient.MarshalJSON()
-	fmt.Printf("CP: JSON '%s'\n", myJSON)
+	if true == *jsonFlag {
+		myJSON, _ := myClient.MarshalJSON()
+		fmt.Printf("CP: JSON '%s'\n", myJSON)
+	}
 
 	//
 	// Create a 'finder'
 	//
 	myFinder := find.NewFinder(myClient.Client, true)
+	fmt.Printf("CP: Got finder: '%s'\n", reflect.TypeOf(myFinder))
 
 	//
-	// Find the default datacenter
+	// List the datacenters at the specified path
 	//
-	myDefaultDC, err := myFinder.Datacenter(ctx, "/Poole/NetVault Development")
-	if err != nil {
-		fmt.Println(err)
-		return
+	myDCs, err := myFinder.DatacenterList(ctx, *datacenterPath)
+	fmt.Printf("Got '%d' datacenter objects: '%s'\n",
+		len(myDCs),
+		reflect.TypeOf(myDCs))
+
+	for _, element := range myDCs {
+		myDatacenter := element
+		fmt.Printf("Datacenter: '%s'\n", myDatacenter.Name())
+		fmt.Printf("DC Type: '%s'\n", reflect.TypeOf(myDatacenter))
+//		dumpDatacenterInfo(myDatacenter)
 	}
-	myFinder.SetDatacenter(myDefaultDC)
 
-	myObjName, err := myDefaultDC.ObjectName(ctx)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 
-	fmt.Printf("CP: ObjName '%s'\n", myObjName)
-
+//	myFinder.SetDatacenter(myDefaultDC)
+//	fmt.Printf("Got DC: '%s'\n", reflect.TypeOf(myDefaultDC))
 
 }
+
+//func dumpDatacenterInfo(thisDC *object.Datacenter) {
+//	thisDC.arse
+//}
