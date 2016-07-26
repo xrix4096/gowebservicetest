@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"runtime"
 	"flag"
-	"reflect"
 	"net/url"
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
@@ -93,20 +92,19 @@ func muckAbout() {
 	// Create a 'finder'
 	//
 	myFinder := find.NewFinder(myClient.Client, true)
-	fmt.Printf("CP: Got finder: '%s'\n", reflect.TypeOf(myFinder))
+	fmt.Printf("CP: Got finder: '%T'\n", myFinder)
 
 	//
 	// List the datacenters at the specified path
 	//
 	myDCs, err := myFinder.DatacenterList(ctx, *datacenterPath)
-	fmt.Printf("Got '%d' datacenter objects: '%s'\n",
-		len(myDCs),
-		reflect.TypeOf(myDCs))
+	fmt.Printf("Got '%d' datacenter objects: '%T'\n",
+		len(myDCs), myDCs)
 
 	for _, element := range myDCs {
 		myDatacenter := element
 		fmt.Printf("Datacenter: '%s'\n", myDatacenter.Name())
-		fmt.Printf("DC Type: '%s'\n", reflect.TypeOf(myDatacenter))
+		fmt.Printf("DC Type: '%T'\n", myDatacenter)
 //		dumpDatacenterInfo(myDatacenter)
 	}
 
