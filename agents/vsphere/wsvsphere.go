@@ -21,11 +21,11 @@ var datacenterPath = flag.String("dcpath", "", "Path containing datacenter(s)")
 var jsonFlag = flag.Bool("dumpjson", false,
 	"Enable dump of client info as JSON")
 
+
 //
 // main
 //
 func main() {
-
 	//
 	// Process CLI arguments
 	//
@@ -34,7 +34,6 @@ func main() {
 	fmt.Printf("Running on %s....\n", runtime.GOOS)
 
 	muckAbout()
-
 }
 
 //
@@ -105,6 +104,8 @@ func muckAbout() {
 		myDatacenter := element
 		fmt.Printf("Datacenter: '%s'\n", myDatacenter.Name())
 		fmt.Printf("DC Type: '%T'\n", myDatacenter)
+		fmt.Printf("DC Ref: '%+v'\n", myDatacenter.Reference())
+		fmt.Printf("DC Ref Type: '%T'\n", myDatacenter.Reference())
 //		dumpDatacenterInfo(myDatacenter)
 	}
 
