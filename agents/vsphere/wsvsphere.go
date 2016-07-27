@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/object"
 )
 
 //
@@ -78,9 +79,14 @@ func muckAbout() {
 	}
 
 	fmt.Printf("Connected to server version '%s'\n", myClient.Version)
+	fmt.Printf("Root folder: '%v'\n",myClient.ServiceContent.RootFolder)
+	fmt.Printf("About: '%+v'\n",myClient.ServiceContent.About)
+
+//	myPropCollector := myClient.PropertyCollector()
+
 
 	//
-	// Dump some JSON info of the client
+	// Optionally dump some JSON info of the client
 	//
 	if true == *jsonFlag {
 		myJSON, _ := myClient.MarshalJSON()
@@ -91,30 +97,43 @@ func muckAbout() {
 	// Create a 'finder'
 	//
 	myFinder := find.NewFinder(myClient.Client, true)
-	fmt.Printf("CP: Got finder: '%T'\n", myFinder)
 
 	//
 	// List the datacenters at the specified path
 	//
 	myDCs, err := myFinder.DatacenterList(ctx, *datacenterPath)
-	fmt.Printf("Got '%d' datacenter objects: '%T'\n",
-		len(myDCs), myDCs)
+	fmt.Printf("Got '%d' datacenter objects\n", len(myDCs))
 
 	for _, element := range myDCs {
 		myDatacenter := element
-		fmt.Printf("Datacenter: '%s'\n", myDatacenter.Name())
-		fmt.Printf("DC Type: '%T'\n", myDatacenter)
-		fmt.Printf("DC Ref: '%+v'\n", myDatacenter.Reference())
-		fmt.Printf("DC Ref Type: '%T'\n", myDatacenter.Reference())
-//		dumpDatacenterInfo(myDatacenter)
+		dumpDatacenterInfo(ctx, myDatacenter)
 	}
-
-
-//	myFinder.SetDatacenter(myDefaultDC)
-//	fmt.Printf("Got DC: '%s'\n", reflect.TypeOf(myDefaultDC))
 
 }
 
-//func dumpDatacenterInfo(thisDC *object.Datacenter) {
-//	thisDC.arse
-//}
+//
+// dumpDatacenterInfo:
+//  Dump interesting info about a Datacenter object
+//
+func dumpDatacenterInfo(ctx context.Context, thisDC *object.Datacenter) {
+	fmt.Printf("\nDatacenter\n")
+	fmt.Printf("----------\n\n")
+	fmt.Printf("Name: \t\t\t\t %v (%v)\n", thisDC.Name(), thisDC.Reference())
+	fmt.Printf("InventoryPath: \t\t\t %v\n", thisDC.InventoryPath)
+
+	myFolders, err := thisDC.Folders(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get folders for datacenter: %s\n", err)
+		return
+	}
+
+	fmt.Printf("Virtual Machine Folder: \t %v\n",
+		myFolders.VmFolder.InventoryPath)
+	fmt.Printf("Host Folder: \t\t\t %v\n", myFolders.HostFolder.InventoryPath)
+	fmt.Printf("Datastore Folder: \t\t %v\n",
+		myFolders.DatastoreFolder.InventoryPath)
+	fmt.Printf("Network Folder: \t\t %v\n",
+		myFolders.NetworkFolder.InventoryPath)
+
+
+}
