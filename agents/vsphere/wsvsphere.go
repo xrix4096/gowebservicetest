@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"flag"
+	"path"
 	"net/url"
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
@@ -102,25 +103,36 @@ func muckAbout() {
 	// List the datacenters at the specified path
 	//
 	myDCs, err := myFinder.DatacenterList(ctx, *datacenterPath)
+	printTypeAndValue("Finder", myFinder)
 	fmt.Printf("Got '%d' datacenter objects\n", len(myDCs))
 
 	for _, element := range myDCs {
 		myDatacenter := element
-		dumpDatacenterInfo(ctx, myDatacenter)
+		dumpDatacenterInfo(ctx, myFinder, myDatacenter)
 	}
+
 
 }
 
 //
 // dumpDatacenterInfo:
-//  Dump interesting info about a Datacenter object
+//  Dump interesting info about an object.Datacenter object
 //
-func dumpDatacenterInfo(ctx context.Context, thisDC *object.Datacenter) {
+func dumpDatacenterInfo(ctx context.Context,
+	myFinder *find.Finder,
+	thisDC *object.Datacenter) {
 	fmt.Printf("\nDatacenter\n")
 	fmt.Printf("----------\n\n")
+
+	//
+	// Basic Datacenter info
+	//
 	fmt.Printf("Name: \t\t\t\t %v (%v)\n", thisDC.Name(), thisDC.Reference())
 	fmt.Printf("InventoryPath: \t\t\t %v\n", thisDC.InventoryPath)
 
+	//
+	// Get the various folders
+	//
 	myFolders, err := thisDC.Folders(ctx)
 	if err != nil {
 		fmt.Printf("Failed to get folders for datacenter: %s\n", err)
@@ -135,5 +147,53 @@ func dumpDatacenterInfo(ctx context.Context, thisDC *object.Datacenter) {
 	fmt.Printf("Network Folder: \t\t %v\n",
 		myFolders.NetworkFolder.InventoryPath)
 
+	//
+	// Get host system list
+	//
+	myHosts, err := myFinder.HostSystemList(ctx,
+		path.Join(myFolders.HostFolder.InventoryPath, "*"))
+	if err != nil {
+		fmt.Printf("Failed to get host system list: %v\n", err)
+		return
+	}
 
+	fmt.Printf("\n%d Hosts:\n", len(myHosts))
+	for index, element := range myHosts {
+		fmt.Printf("Host %d\n", index)
+		myHost := element
+		dumpHostSystemInfo(ctx, myFinder, myHost)
+	}
+
+
+
+}
+
+//
+// dumpHostSystemInfo:
+//  Dump interesting info about an object.HostSystem object
+//
+func dumpHostSystemInfo(ctx context.Context,
+	myFinder *find.Finder,
+	thisHost *object.HostSystem) {
+
+	fmt.Printf("Name: \t\t\t\t %v (%v)\n",
+		thisHost.Name(),
+		thisHost.Reference())
+	fmt.Printf("InventoryPath: \t\t\t %v\n",
+		thisHost.InventoryPath)
+
+
+	myIPs, err := thisHost.ManagementIPs(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get IPs for host: %v\n", err)
+		return
+	}
+
+	printTypeAndValue("IPS", myIPs)
+
+
+}
+
+func printTypeAndValue(name string, myVar interface {}) {
+	fmt.Printf("CP: %s: '%T' '%+v'\n", name, myVar, myVar)
 }
