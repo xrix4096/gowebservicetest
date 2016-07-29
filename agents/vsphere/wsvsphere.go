@@ -204,7 +204,13 @@ func dumpDatacenterInfo(ctx context.Context,
 	//
 	// filterProps specifies which fields we'd like returned
 	//
-	filterProps := []string{"info", "summary"}
+	filterProps := []string{
+		"info",
+		"summary",
+		"capability",
+		"parent",
+		"overallStatus",
+	}
 
 	//
 	// myResult structure passed to and from property collector
@@ -334,6 +340,8 @@ func dumpDatastoreInfo(ctx context.Context,
 	fullDatastore *mo.Datastore) {
 
 	dsSummary := fullDatastore.Summary
+	dsCaps := fullDatastore.Capability
+	vmfsInfo := fullDatastore.Info.GetDatastoreInfo()
 
 	//
 	// Basic datastore info
@@ -347,7 +355,24 @@ func dumpDatastoreInfo(ctx context.Context,
 	fmt.Printf("URL: \t\t\t\t %v\n", dsSummary.Url)
 	fmt.Printf("Capacity: \t\t\t %v\n", dsSummary.Capacity)
 	fmt.Printf("Free Space: \t\t\t %v\n", dsSummary.FreeSpace)
+	fmt.Printf("Max File Size: \t\t\t %v\n", "ARSE")
 	fmt.Printf("MultiHost: \t\t\t %v\n", *dsSummary.MultipleHostAccess)
+	fmt.Printf("Status: \t\t\t %v\n", fullDatastore.OverallStatus)
+	fmt.Printf("Parent: \t\t\t %v\n", fullDatastore.Parent)
+	fmt.Printf("Supports Directory Hierarchy: \t %v\n",
+		dsCaps.DirectoryHierarchySupported)
+	fmt.Printf("Native Snapshots: \t\t %v\n", *dsCaps.NativeSnapshotSupported)
+	fmt.Printf("Per-file Thin Provisioning: \t %v\n",
+		dsCaps.PerFileThinProvisioningSupported)
+	fmt.Printf("Supports Raw Disk Mappings: \t %v\n",
+		dsCaps.RawDiskMappingsSupported)
+	fmt.Printf("Supports StorageIORM: \t\t %v\n", *dsCaps.StorageIORMSupported)
+	fmt.Printf("Sparse Files: \t\t\t %v\n", *dsCaps.SeSparseSupported)
+	fmt.Printf("Max File Size: \t\t\t %v\n", vmfsInfo.MaxFileSize)
+	fmt.Printf("Max Virtual Disk Size: \t\t %v\n",
+		vmfsInfo.MaxVirtualDiskCapacity)
+	fmt.Printf("Max Mem File Size: \t\t %v\n", vmfsInfo.MaxMemoryFileSize)
+	fmt.Printf("Timestamp: \t\t\t %v\n", vmfsInfo.Timestamp)
 }
 
 //
