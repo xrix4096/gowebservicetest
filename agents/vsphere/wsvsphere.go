@@ -13,6 +13,11 @@ import (
 )
 
 //
+// Globals
+//
+
+
+//
 // Command line flags
 //
 var userFlag = flag.String("user", "default", "ESX / vCenter user")
@@ -33,7 +38,9 @@ func main() {
 	//
 	flag.Parse()
 
-	fmt.Printf("Running on %s....\n", runtime.GOOS)
+	if *verboseFlag {
+		fmt.Printf("Running on %s....\n", runtime.GOOS)
+	}
 
 	muckAbout()
 }
@@ -82,13 +89,7 @@ func muckAbout() {
 
 	//
 	// Print service information
-
-
 	//
-	// @todo Print ServiceContent About info nicely
-	//
-//	fmt.Printf("About: '%+v'\n",myClient.ServiceContent.About)
-
 	myAboutInfo := myClient.ServiceContent.About
 	fmt.Printf("Server Name: \t\t\t %v\n", myAboutInfo.FullName)
 	fmt.Printf("API Type: \t\t\t %v\n", myAboutInfo.ApiType)
@@ -100,9 +101,6 @@ func muckAbout() {
 	fmt.Printf("Product Line: \t\t\t %v\n", myAboutInfo.ProductLineId)
 	fmt.Printf("Host OS: \t\t\t %v\n", myAboutInfo.OsType)
 	fmt.Printf("Vendor: \t\t\t %v\n", myAboutInfo.Vendor)
-
-//	myPropCollector := myClient.PropertyCollector()
-
 
 	//
 	// Optionally dump some JSON info of the client
@@ -287,7 +285,10 @@ func dumpDatastoreInfo(ctx context.Context,
 }
 
 
-
+//
+// printTypeAndValue:
+//  Debug function, quickly check on type and value of an unknown typed var
+//
 func printTypeAndValue(name string, myVar interface {}) {
 	fmt.Printf("CP: %s: '%T' '%+v'\n", name, myVar, myVar)
 }
