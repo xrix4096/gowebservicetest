@@ -10,6 +10,9 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 //
@@ -128,7 +131,7 @@ func muckAbout() {
 
 	for _, element := range myDCs {
 		myDatacenter := element
-		dumpDatacenterInfo(ctx, myFinder, myDatacenter)
+		dumpDatacenterInfo(ctx, myClient, myFinder, myDatacenter)
 	}
 
 
@@ -139,6 +142,7 @@ func muckAbout() {
 //  Dump interesting info about an object.Datacenter object
 //
 func dumpDatacenterInfo(ctx context.Context,
+	myClient *govmomi.Client,
 	myFinder *find.Finder,
 	thisDC *object.Datacenter) {
 	fmt.Printf("\nDatacenter\n")
@@ -194,16 +198,80 @@ func dumpDatacenterInfo(ctx context.Context,
 		fmt.Printf("Failed to get datastore list: %v\n", err)
 		return
 	}
-	fmt.Printf("%d Datastores:\n\n", len(myDatastores))
-	for index, element := range myDatastores {
-		fmt.Printf("-- Datastore %d --\n", index)
-		myDatastore := element
-		dumpDatastoreInfo(ctx, myFinder, myDatastore)
-		fmt.Print("\n")
+
+	//
+	// Fetch full Datastore info via a PropertyCollector
+	//
+	// filterProps specifies which fields we'd like returned
+	//
+	filterProps := []string{"info", "summary"}
+
+	//
+	// myResult structure passed to and from property collector
+	//
+	var myResult infoResult
+
+	//
+	// Put list of Datastores in myResult.objects
+	//
+	myResult.objects = append(myResult.objects, myDatastores...)
+	if len(myResult.objects) > 0 {
+		//
+		// Make a set of object references for each of the datastores
+		//
+		dsRefs := make([]types.ManagedObjectReference, 0, len(myResult.objects))
+		for _, element := range myResult.objects {
+			dsRefs = append(dsRefs, element.Reference())
+		}
+
+		//
+		// Run Retrieve() on the property collector
+		//
+		myPC := property.DefaultCollector(myClient.Client)
+		err := myPC.Retrieve(ctx, dsRefs, filterProps, &myResult.Datastores)
+		if err != nil {
+			fmt.Printf("Failed to run PC: %v\n", err)
+			return
+		}
+
+		//
+		// myResult.Datastores now contains the requested datastore info. Since
+		// the property collector does not guarantee the order of the results
+		// matches the order of the list of requested references we make a map
+		// that allows us to access them my their ManagedObjectReference and
+		// walk the source list (myRequest.objects) in that order pulling
+		// in info from the map by ManagedObjectReference as needed
+		//
+		fullDatastores := make(map[types.ManagedObjectReference]mo.Datastore,
+			len(myResult.Datastores))
+		for _, element := range myResult.Datastores {
+			fullDatastores[element.Reference()] = element
+		}
+
+		//
+		// Now we have all the info; the basic object.Datastore info in
+		// myResult.objects and the mo.Datastore info in the fullDatastores map
+		//
+		for index, element := range myResult.objects {
+			fmt.Printf("-- Datastore %d --\n", index)
+			refDS := element
+			fullDS := fullDatastores[refDS.Reference()]
+			dumpDatastoreInfo(ctx, myFinder, refDS, &fullDS)
+			fmt.Print("\n")
+		}
 	}
-
-
 }
+
+
+//
+// infoResult:
+//  Type used by property collector to return results
+//
+type infoResult struct {
+	Datastores []mo.Datastore
+	objects    []*object.Datastore
+}
+
 
 //
 // dumpHostSystemInfo:
@@ -262,7 +330,10 @@ func dumpHostSystemInfo(ctx context.Context,
 //
 func dumpDatastoreInfo(ctx context.Context,
 	myFinder *find.Finder,
-	thisDatastore *object.Datastore) {
+	thisDatastore *object.Datastore,
+	fullDatastore *mo.Datastore) {
+
+	dsSummary := fullDatastore.Summary
 
 	//
 	// Basic datastore info
@@ -272,18 +343,12 @@ func dumpDatastoreInfo(ctx context.Context,
 		thisDatastore.Reference())
 	fmt.Printf("InventoryPath: \t\t\t %v\n",
 		thisDatastore.InventoryPath)
-
-	//
-	// Filesystem type
-	//
-	myFSType, err := thisDatastore.Type(ctx)
-	if err != nil {
-		fmt.Printf("Failed to get filesystem type: %v\n", err)
-		return
-	}
-	fmt.Printf("Type: \t\t\t\t %v\n", myFSType)
+	fmt.Printf("Type: \t\t\t\t %v\n", dsSummary.Type)
+	fmt.Printf("URL: \t\t\t\t %v\n", dsSummary.Url)
+	fmt.Printf("Capacity: \t\t\t %v\n", dsSummary.Capacity)
+	fmt.Printf("Free Space: \t\t\t %v\n", dsSummary.FreeSpace)
+	fmt.Printf("MultiHost: \t\t\t %v\n", *dsSummary.MultipleHostAccess)
 }
-
 
 //
 // printTypeAndValue:
