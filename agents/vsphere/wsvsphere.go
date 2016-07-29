@@ -20,8 +20,8 @@ var pwFlag = flag.String("password", "", "ESX / vCenter password")
 var urlFlag = flag.String("url", "https://username:password@host/sdk",
 	"ESX / vCenter URL")
 var datacenterPath = flag.String("dcpath", "", "Path containing datacenter(s)")
-var jsonFlag = flag.Bool("dumpjson", false,
-	"Enable dump of client info as JSON")
+var verboseFlag = flag.Bool("verbose", false,
+	"Extra verbose output")
 
 
 //
@@ -65,23 +65,41 @@ func muckAbout() {
 		fmt.Printf("Failed to parse base URL '%s': '%s'\n", myBaseURL, err)
 		return
 	}
-
 	u.User = url.UserPassword(myUser, myPW)
-	fmt.Printf("DEBUG: FullURL = '%s'\n", u.String())
+
+	if true == *verboseFlag {
+		fmt.Printf("DEBUG: FullURL = '%s'\n", u.String())
+	}
 
 	//
 	// Try and connect to that vCenter
 	//
-	fmt.Printf("Connecting.... ")
 	myClient, err := govmomi.NewClient(ctx, u, true)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Printf("Connected to server version '%s'\n", myClient.Version)
-	fmt.Printf("Root folder: '%v'\n",myClient.ServiceContent.RootFolder)
-	fmt.Printf("About: '%+v'\n",myClient.ServiceContent.About)
+	//
+	// Print service information
+
+
+	//
+	// @todo Print ServiceContent About info nicely
+	//
+//	fmt.Printf("About: '%+v'\n",myClient.ServiceContent.About)
+
+	myAboutInfo := myClient.ServiceContent.About
+	fmt.Printf("Server Name: \t\t\t %v\n", myAboutInfo.FullName)
+	fmt.Printf("API Type: \t\t\t %v\n", myAboutInfo.ApiType)
+	fmt.Printf("API Version: \t\t\t %v\n", myAboutInfo.ApiVersion)
+	fmt.Printf("Root folder: \t\t\t %v\n",myClient.ServiceContent.RootFolder)
+	fmt.Printf("InstanceID: \t\t\t %v\n",myAboutInfo.InstanceUuid)
+	fmt.Printf("Product: \t\t\t %v\n", myAboutInfo.LicenseProductName)
+	fmt.Printf("Product Version: \t\t %v\n", myAboutInfo.LicenseProductVersion)
+	fmt.Printf("Product Line: \t\t\t %v\n", myAboutInfo.ProductLineId)
+	fmt.Printf("Host OS: \t\t\t %v\n", myAboutInfo.OsType)
+	fmt.Printf("Vendor: \t\t\t %v\n", myAboutInfo.Vendor)
 
 //	myPropCollector := myClient.PropertyCollector()
 
@@ -89,7 +107,7 @@ func muckAbout() {
 	//
 	// Optionally dump some JSON info of the client
 	//
-	if true == *jsonFlag {
+	if true == *verboseFlag {
 		myJSON, _ := myClient.MarshalJSON()
 		fmt.Printf("CP: JSON '%s'\n", myJSON)
 	}
@@ -100,11 +118,15 @@ func muckAbout() {
 	myFinder := find.NewFinder(myClient.Client, true)
 
 	//
+	// @todo Use finder.ManagedObjectList() to walk from "/" and find any
+	// datacenters rather than needing to specify the DC path on the CLI
+	//
+
+	//
 	// List the datacenters at the specified path
 	//
 	myDCs, err := myFinder.DatacenterList(ctx, *datacenterPath)
-	printTypeAndValue("Finder", myFinder)
-	fmt.Printf("Got '%d' datacenter objects\n", len(myDCs))
+	fmt.Printf("\nGot '%d' datacenter objects\n", len(myDCs))
 
 	for _, element := range myDCs {
 		myDatacenter := element
@@ -157,13 +179,30 @@ func dumpDatacenterInfo(ctx context.Context,
 		return
 	}
 
-	fmt.Printf("\n%d Hosts:\n", len(myHosts))
+	fmt.Printf("%d Hosts:\n\n", len(myHosts))
 	for index, element := range myHosts {
-		fmt.Printf("Host %d\n", index)
+		fmt.Printf("-- Host %d --\n", index)
 		myHost := element
 		dumpHostSystemInfo(ctx, myFinder, myHost)
+		fmt.Print("\n")
 	}
 
+	//
+	// Get datastore list
+	//
+	myDatastores, err := myFinder.DatastoreList(ctx,
+		path.Join(myFolders.DatastoreFolder.InventoryPath, "*"))
+	if err != nil {
+		fmt.Printf("Failed to get datastore list: %v\n", err)
+		return
+	}
+	fmt.Printf("%d Datastores:\n\n", len(myDatastores))
+	for index, element := range myDatastores {
+		fmt.Printf("-- Datastore %d --\n", index)
+		myDatastore := element
+		dumpDatastoreInfo(ctx, myFinder, myDatastore)
+		fmt.Print("\n")
+	}
 
 
 }
@@ -218,6 +257,36 @@ func dumpHostSystemInfo(ctx context.Context,
 		resPoolName,
 		myResPool.Reference())
 }
+
+//
+// dumpDatastoreInfo:
+//  Dump interesting info about an object.Datastore object
+//
+func dumpDatastoreInfo(ctx context.Context,
+	myFinder *find.Finder,
+	thisDatastore *object.Datastore) {
+
+	//
+	// Basic datastore info
+	//
+	fmt.Printf("Name: \t\t\t\t %v (%v)\n",
+		thisDatastore.Name(),
+		thisDatastore.Reference())
+	fmt.Printf("InventoryPath: \t\t\t %v\n",
+		thisDatastore.InventoryPath)
+
+	//
+	// Filesystem type
+	//
+	myFSType, err := thisDatastore.Type(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get filesystem type: %v\n", err)
+		return
+	}
+	fmt.Printf("Type: \t\t\t\t %v\n", myFSType)
+}
+
+
 
 func printTypeAndValue(name string, myVar interface {}) {
 	fmt.Printf("CP: %s: '%T' '%+v'\n", name, myVar, myVar)
