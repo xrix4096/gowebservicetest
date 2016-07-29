@@ -176,22 +176,47 @@ func dumpHostSystemInfo(ctx context.Context,
 	myFinder *find.Finder,
 	thisHost *object.HostSystem) {
 
+	//
+	// Basic host system info
+	//
 	fmt.Printf("Name: \t\t\t\t %v (%v)\n",
 		thisHost.Name(),
 		thisHost.Reference())
 	fmt.Printf("InventoryPath: \t\t\t %v\n",
 		thisHost.InventoryPath)
 
-
+	//
+	// Management IP address(es)
+	//
 	myIPs, err := thisHost.ManagementIPs(ctx)
 	if err != nil {
 		fmt.Printf("Failed to get IPs for host: %v\n", err)
 		return
 	}
 
-	printTypeAndValue("IPS", myIPs)
+	fmt.Printf("Management IPs: \t\t ")
+	for _, element := range myIPs {
+		thisIP := element
+		fmt.Print(thisIP)
+	}
+	fmt.Printf("\n")
 
+	//
+	// Resource Pool
+	//
+	myResPool, err := thisHost.ResourcePool(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get resource pool for host: %v", err)
+		return
+	}
 
+	resPoolName := myResPool.Name()
+	if resPoolName == "" {
+		resPoolName = "(Unnamed)"
+	}
+	fmt.Printf("Resource Pool: \t\t\t %v (%v)\n",
+		resPoolName,
+		myResPool.Reference())
 }
 
 func printTypeAndValue(name string, myVar interface {}) {
