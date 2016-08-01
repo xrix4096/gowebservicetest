@@ -92,13 +92,26 @@ func muckAbout() {
 	}
 
 	//
+	// Get root folder
+	//
+	rootFolder, err := getFolderFromRef(ctx,
+		myClient,
+		myClient.ServiceContent.RootFolder)
+	if err != nil {
+		fmt.Printf("Failed to get root folder: %v\n", err)
+		return
+	}
+
+	//
 	// Print service information
 	//
 	myAboutInfo := myClient.ServiceContent.About
 	fmt.Printf("Server Name: \t\t\t %v\n", myAboutInfo.FullName)
 	fmt.Printf("API Type: \t\t\t %v\n", myAboutInfo.ApiType)
 	fmt.Printf("API Version: \t\t\t %v\n", myAboutInfo.ApiVersion)
-	fmt.Printf("Root folder: \t\t\t %v\n",myClient.ServiceContent.RootFolder)
+	fmt.Printf("Root folder: \t\t\t %v (%v)\n",
+		rootFolder.Name,
+		rootFolder.Self)
 	fmt.Printf("InstanceID: \t\t\t %v\n",myAboutInfo.InstanceUuid)
 	fmt.Printf("Product: \t\t\t %v\n", myAboutInfo.LicenseProductName)
 	fmt.Printf("Product Version: \t\t %v\n", myAboutInfo.LicenseProductVersion)
@@ -165,16 +178,24 @@ func dumpDatacenterInfo(ctx context.Context,
 	}
 
 	//
-	// DEBUG: Dump JSON
-	//
-	printAsJSON("DC INFO", myDCInfo)
-
-
-	//
 	// Basic Datacenter info
 	//
 	fmt.Printf("Name: \t\t\t\t %v (%v)\n", thisDC.Name(), thisDC.Reference())
+	fmt.Printf("Status: \t\t\t %v\n", myDCInfo.OverallStatus)
 	fmt.Printf("InventoryPath: \t\t\t %v\n", thisDC.InventoryPath)
+
+	//
+	// Get parent Folder
+	//
+	parentInfo, err := getFolderFromRef(ctx, myClient, *myDCInfo.Parent)
+	if err != nil {
+		fmt.Printf("Failed to get parent folder: %v\n", err)
+		return
+	}
+	fmt.Printf("Parent Folder: \t\t\t %s (%v)\n",
+		parentInfo.Name,
+		parentInfo.Self)
+
 
 	//
 	// Get the various folders
@@ -397,6 +418,41 @@ func dumpDatastoreInfo(ctx context.Context,
 	fmt.Printf("Timestamp: \t\t\t %v\n", vmfsInfo.Timestamp)
 }
 
+
+func getFolderFromRef(ctx context.Context,
+	myClient *govmomi.Client,
+	myRef types.ManagedObjectReference) (mo.Folder, error) {
+
+	var myResult mo.Folder
+	myPC := property.DefaultCollector(myClient.Client)
+	err := myPC.RetrieveOne(ctx, myRef, nil, &myResult)
+
+	return myResult, err
+}
+
+
+//
+// dumpFolderInfo:
+//  Print out folder information
+//
+func dumpFolderInfo(ctx context.Context,
+	myClient *govmomi.Client,
+	myRef types.ManagedObjectReference) {
+
+	var myFolderInfo mo.Folder
+
+	myPC := property.DefaultCollector(myClient.Client)
+	err := myPC.RetrieveOne(ctx, myRef, nil, &myFolderInfo)
+	if err != nil {
+		fmt.Printf("Failed to get folder '%s': '%s'\n", myRef, err)
+		return
+	}
+
+	fmt.Printf("%v (%v)", myFolderInfo.Name, myFolderInfo.Self)
+	//	printAsJSON("CP FOLDER INFO DUMP", myFolderInfo)
+}
+
+
 //
 // printTypeAndValue:
 //  Debug function, quickly check on type and value of an unknown typed var
@@ -405,6 +461,10 @@ func printTypeAndValue(name string, myVar interface {}) {
 	fmt.Printf("CP: %s: '%T' '%+v'\n", name, myVar, myVar)
 }
 
+//
+// printAsJSON:
+//  Debug function, dump out the specified variable in JSON format
+//
 func printAsJSON(name string, myVar interface {}) {
 	myJSON, _ := json.MarshalIndent(myVar, "", "    ")
 	fmt.Printf("CP: %s: '%s'\n", name, myJSON)
