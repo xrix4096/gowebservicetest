@@ -185,7 +185,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	fmt.Printf("InventoryPath: \t\t\t %v\n", thisDC.InventoryPath)
 
 	//
-	// Get parent Folder
+	// Get parent folder
 	//
 	parentInfo, err := getFolderFromRef(ctx, myClient, *myDCInfo.Parent)
 	if err != nil {
@@ -200,7 +200,9 @@ func dumpDatacenterInfo(ctx context.Context,
 	// Check if the parent folder is at the root. If not we need to prepend
 	// the parent prefix to the inventory paths, which appears to be a bug in
 	// the API since they really should be returning an absolute value for
-	// the InventoryPaths in the datacenter Folders set
+	// the InventoryPaths in the datacenter Folders set.
+	//
+	// @todo Could fix Datacenter.Folders() to set the correct InventoryPath
 	//
 	var invPrefix = ""
 	if *myDCInfo.Parent != myClient.ServiceContent.RootFolder {
@@ -208,7 +210,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	}
 
 	//
-	// Get the various folders
+	// Get the various subfolders
 	//
 	myFolders, err := thisDC.Folders(ctx)
 	if err != nil {
@@ -238,7 +240,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	for index, element := range myHosts {
 		fmt.Printf("-- Host %d --\n", index)
 		myHost := element
-		dumpHostSystemInfo(ctx, myFinder, myHost)
+		dumpHostSystemInfo(ctx, myClient, myFinder, myHost)
 		fmt.Print("\n")
 	}
 
@@ -337,8 +339,27 @@ type infoResult struct {
 //  Dump interesting info about an object.HostSystem object
 //
 func dumpHostSystemInfo(ctx context.Context,
+	myClient *govmomi.Client,
 	myFinder *find.Finder,
 	thisHost *object.HostSystem) {
+
+	var props []string
+	props = []string {
+		"hardware",
+		"overallStatus",
+		"summary",
+	}
+
+	var fullHost mo.HostSystem
+
+	//
+	// Get serverside properties
+	//
+	err := thisHost.Properties(ctx, thisHost.Reference(), props, &fullHost)
+	if err != nil {
+		fmt.Printf("Failed to get serverside properties of host: '%v'\n", err)
+		return
+	}
 
 	//
 	// Basic host system info
@@ -348,6 +369,25 @@ func dumpHostSystemInfo(ctx context.Context,
 		thisHost.Reference())
 	fmt.Printf("InventoryPath: \t\t\t %v\n",
 		thisHost.InventoryPath)
+	fmt.Printf("Status: \t\t\t %v\n", fullHost.OverallStatus)
+	fmt.Printf("Model Type: \t\t\t %v - %v\n",
+		fullHost.Summary.Hardware.Vendor,
+		fullHost.Summary.Hardware.Model)
+	fmt.Printf("Memory: \t\t\t %v\n", fullHost.Summary.Hardware.MemorySize)
+	fmt.Printf("CPU Type: \t\t\t %v\n", fullHost.Summary.Hardware.CpuModel)
+	fmt.Printf("CPU Clock: \t\t\t %v\n", fullHost.Summary.Hardware.CpuMhz)
+	fmt.Printf("Cores x Threads: \t\t %v x %v\n",
+		fullHost.Summary.Hardware.NumCpuCores,
+		fullHost.Summary.Hardware.NumCpuThreads)
+	fmt.Printf("Power: \t\t\t\t %v\n", fullHost.Summary.Runtime.PowerState)
+	fmt.Printf("Boot Time: \t\t\t %v\n", fullHost.Summary.Runtime.BootTime)
+	fmt.Printf("Maintenance Mode: \t\t %v\n",
+		fullHost.Summary.Runtime.InMaintenanceMode)
+	fmt.Printf("Product: \t\t\t %v\n",
+		fullHost.Summary.Config.Product.FullName)
+	fmt.Printf("Management Server IP \t\t %v\n",
+		fullHost.Summary.ManagementServerIp)
+
 
 	//
 	// Management IP address(es)
