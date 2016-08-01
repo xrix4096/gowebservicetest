@@ -255,7 +255,10 @@ func dumpDatacenterInfo(ctx context.Context,
 	}
 
 	//
-	// Fetch full Datastore info via a PropertyCollector
+	// Fetch full Datastore info via a PropertyCollector. This is a fair
+	// example of how to be efficient by fetching a whole bunch of objects
+	// at the same time, as opposed to the RetrieveOne() approach that is
+	// simpler but results in many requests
 	//
 	// filterProps specifies which fields we'd like returned
 	//
