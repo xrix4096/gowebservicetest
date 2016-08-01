@@ -6,6 +6,7 @@ import (
 	"flag"
 	"path"
 	"net/url"
+	"encoding/json"
 	"golang.org/x/net/context"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
@@ -147,6 +148,27 @@ func dumpDatacenterInfo(ctx context.Context,
 	thisDC *object.Datacenter) {
 	fmt.Printf("\nDatacenter\n")
 	fmt.Printf("----------\n\n")
+
+	//
+	// Fetch full Datacenter info via property collector
+	//
+	var myDCInfo mo.Datacenter
+
+	//
+	// Run RetrieveOne() on the  property collector
+	//
+	myPC := property.DefaultCollector(myClient.Client)
+	err := myPC.RetrieveOne(ctx, thisDC.Reference(), nil, &myDCInfo)
+	if err != nil {
+		fmt.Printf("Failed to get DC info from property collector: %s", err)
+		return
+	}
+
+	//
+	// DEBUG: Dump JSON
+	//
+	printAsJSON("DC INFO", myDCInfo)
+
 
 	//
 	// Basic Datacenter info
@@ -381,4 +403,9 @@ func dumpDatastoreInfo(ctx context.Context,
 //
 func printTypeAndValue(name string, myVar interface {}) {
 	fmt.Printf("CP: %s: '%T' '%+v'\n", name, myVar, myVar)
+}
+
+func printAsJSON(name string, myVar interface {}) {
+	myJSON, _ := json.MarshalIndent(myVar, "", "    ")
+	fmt.Printf("CP: %s: '%s'\n", name, myJSON)
 }
