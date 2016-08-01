@@ -196,6 +196,16 @@ func dumpDatacenterInfo(ctx context.Context,
 		parentInfo.Name,
 		parentInfo.Self)
 
+	//
+	// Check if the parent folder is at the root. If not we need to prepend
+	// the parent prefix to the inventory paths, which appears to be a bug in
+	// the API since they really should be returning an absolute value for
+	// the InventoryPaths in the datacenter Folders set
+	//
+	var invPrefix = ""
+	if *myDCInfo.Parent != myClient.ServiceContent.RootFolder {
+		invPrefix = path.Join("/", parentInfo.Name)
+	}
 
 	//
 	// Get the various folders
@@ -218,7 +228,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	// Get host system list
 	//
 	myHosts, err := myFinder.HostSystemList(ctx,
-		path.Join(myFolders.HostFolder.InventoryPath, "*"))
+		path.Join(invPrefix, myFolders.HostFolder.InventoryPath, "*"))
 	if err != nil {
 		fmt.Printf("Failed to get host system list: %v\n", err)
 		return
@@ -236,7 +246,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	// Get datastore list
 	//
 	myDatastores, err := myFinder.DatastoreList(ctx,
-		path.Join(myFolders.DatastoreFolder.InventoryPath, "*"))
+		path.Join(invPrefix, myFolders.DatastoreFolder.InventoryPath, "*"))
 	if err != nil {
 		fmt.Printf("Failed to get datastore list: %v\n", err)
 		return
@@ -398,7 +408,6 @@ func dumpDatastoreInfo(ctx context.Context,
 	fmt.Printf("URL: \t\t\t\t %v\n", dsSummary.Url)
 	fmt.Printf("Capacity: \t\t\t %v\n", dsSummary.Capacity)
 	fmt.Printf("Free Space: \t\t\t %v\n", dsSummary.FreeSpace)
-	fmt.Printf("Max File Size: \t\t\t %v\n", "ARSE")
 	fmt.Printf("MultiHost: \t\t\t %v\n", *dsSummary.MultipleHostAccess)
 	fmt.Printf("Status: \t\t\t %v\n", fullDatastore.OverallStatus)
 	fmt.Printf("Parent: \t\t\t %v\n", fullDatastore.Parent)
