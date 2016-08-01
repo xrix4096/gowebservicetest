@@ -218,13 +218,18 @@ func dumpDatacenterInfo(ctx context.Context,
 		return
 	}
 
-	fmt.Printf("Virtual Machine Folder: \t %v\n",
-		myFolders.VmFolder.InventoryPath)
-	fmt.Printf("Host Folder: \t\t\t %v\n", myFolders.HostFolder.InventoryPath)
-	fmt.Printf("Datastore Folder: \t\t %v\n",
-		myFolders.DatastoreFolder.InventoryPath)
-	fmt.Printf("Network Folder: \t\t %v\n",
-		myFolders.NetworkFolder.InventoryPath)
+	fmt.Printf("Virtual Machine Folder: \t %v (%v)\n",
+		myFolders.VmFolder.InventoryPath,
+		myDCInfo.VmFolder)
+	fmt.Printf("Host Folder: \t\t\t %v (%v)\n",
+		myFolders.HostFolder.InventoryPath,
+		myDCInfo.HostFolder)
+	fmt.Printf("Datastore Folder: \t\t %v (%v)\n",
+		myFolders.DatastoreFolder.InventoryPath,
+		myDCInfo.DatastoreFolder)
+	fmt.Printf("Network Folder: \t\t %v (%v)\n",
+		myFolders.NetworkFolder.InventoryPath,
+		myDCInfo.NetworkFolder)
 
 	//
 	// Get host system list
