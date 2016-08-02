@@ -278,7 +278,7 @@ func dumpDatacenterInfo(ctx context.Context,
 	//
 	// myResult structure passed to and from property collector
 	//
-	var myResult infoResult
+	var myResult datastoreInfoResult
 
 	//
 	// Put list of Datastores in myResult.objects
@@ -299,7 +299,7 @@ func dumpDatacenterInfo(ctx context.Context,
 		myPC := property.DefaultCollector(myClient.Client)
 		err := myPC.Retrieve(ctx, dsRefs, filterProps, &myResult.Datastores)
 		if err != nil {
-			fmt.Printf("Failed to run PC: %v\n", err)
+			fmt.Printf("Failed to fetch datastore objects: %v\n", err)
 			return
 		}
 
@@ -329,14 +329,44 @@ func dumpDatacenterInfo(ctx context.Context,
 			fmt.Print("\n")
 		}
 	}
+
+	//
+	// Networks: This is an example of another approach to getting the server
+	// side properties of some managed objects. Since we already fetched the
+	// datacenter properties we already have a slice containing the references
+	// for each of the networks. We can pass this to a dump function which
+	// can then fetch the properties for all of them in one go
+	//
+	dumpNetworks(ctx, myClient, &myDCInfo.Network)
+
+	//
+	// Virtual machines: These aren't enumerated in the Datacenter managed object
+	// so we can use the finder to get a list of them
+	//
+	myVMs, err := myFinder.VirtualMachineList(ctx,
+		path.Join(invPrefix, myFolders.VmFolder.InventoryPath, "*"))
+	if err != nil {
+		fmt.Printf("Failed to get VM list: %v\n", err)
+		return
+	}
+	fmt.Printf("CP: GOT %d VMS\n", len(myVMs))
+
+	//
+	// CP: WHY ARE WE ONLY GETTING ONE VM?
+	//
+
+
+	dumpVMs(ctx, myClient, &myVMs)
+
+
 }
 
 
 //
-// infoResult:
+// datastoreInfoResult:
 //  Type used by property collector to return results
 //
-type infoResult struct {
+type datastoreInfoResult struct {
 	Datastores []mo.Datastore
 	objects    []*object.Datastore
 }
@@ -393,7 +423,7 @@ func dumpHostSystemInfo(ctx context.Context,
 		fullHost.Summary.Runtime.InMaintenanceMode)
 	fmt.Printf("Product: \t\t\t %v\n",
 		fullHost.Summary.Config.Product.FullName)
-	fmt.Printf("Management Server IP \t\t %v\n",
+	fmt.Printf("Management Server IP: \t\t %v\n",
 		fullHost.Summary.ManagementServerIp)
 
 
@@ -475,7 +505,145 @@ func dumpDatastoreInfo(ctx context.Context,
 	fmt.Printf("Timestamp: \t\t\t %v\n", vmfsInfo.Timestamp)
 }
 
+//
+// dumpNetworks:
+//  Fetch the specified Managed Objects corresponding the the references
+//  passed in and dump out interesting info about the networks
+//
+func dumpNetworks(ctx context.Context,
+	myClient *govmomi.Client,
+	myNetworks *[]types.ManagedObjectReference) {
 
+	var fullNetworks []mo.Network
+
+	//
+	// Fetch info for all of the networks in a single request
+	//
+	myPC := property.DefaultCollector(myClient.Client)
+	err := myPC.Retrieve(ctx, *myNetworks, nil, &fullNetworks)
+	if err != nil {
+		fmt.Printf("Failed to get network objects: %v\n", err)
+		return
+	}
+
+	//
+	// Dump info to output
+	//
+	fmt.Printf("%d Networks:\n\n", len(fullNetworks))
+
+	for index, element := range fullNetworks {
+		thisNetwork := element
+		fmt.Printf("-- Network %d --\n", index)
+		fmt.Printf("Name: \t\t\t\t %v (%v)\n",
+			thisNetwork.Name,
+			thisNetwork.Self.Value)
+		fmt.Printf("Status: \t\t\t %v\n", thisNetwork.OverallStatus)
+		fmt.Printf("Hosts: \t\t\t\t %d\n", len(thisNetwork.Host))
+		fmt.Printf("VMs: \t\t\t\t %d\n", len(thisNetwork.Vm))
+		fmt.Printf("\n")
+	}
+}
+
+//
+// dumpVMs:
+//
+//
+//
+func dumpVMs(ctx context.Context,
+	myClient *govmomi.Client,
+	myVMs *[]*object.VirtualMachine) {
+
+	var myResult vmInfoResult
+
+	//
+	// Put the client side object.VirtualMachine set in myResult.objects
+	//
+	myResult.objects = append(*myVMs)
+
+	//
+	// Build a set of object references for each VM
+	//
+	vmRefs := make([]types.ManagedObjectReference, 0, len(myResult.objects))
+	for _, element := range myResult.objects {
+		vmRefs = append(vmRefs, element.Reference())
+	}
+
+	//
+	// Fetch the managed objects for this set of references
+	//
+	myPC := property.DefaultCollector(myClient.Client)
+	err := myPC.Retrieve(ctx, vmRefs, nil, &myResult.VMs)
+	if err != nil {
+		fmt.Printf("Failed to fetch VM objects: %v\n", err)
+		return
+	}
+
+	//
+	// So we can match up the correct mo.VirtualMachine with the corresponding
+	// object.VirtualMachine despite there being no order assured with the
+	// set returned by Retrieve() build a map of the Managed Objects indexed
+	// by the ManagedObjectReference
+	//
+	fullVMs := make(map[types.ManagedObjectReference]mo.VirtualMachine,
+		len(myResult.VMs))
+	for _, element := range myResult.VMs {
+		fullVMs[element.Reference()] = element
+	}
+
+	//
+	// Dump out the info on the VMs by walking the myVMs list, looking up
+	// server side info as needed in the map
+	//
+	fmt.Printf("%d Virtual Machines:\n", len(myResult.objects))
+	for index, element := range myResult.objects {
+		thisVM := element
+		fullVM := fullVMs[thisVM.Reference()];
+		fmt.Printf("\n-- Virtual Machine %d --\n", index)
+
+		fmt.Printf("Name: \t\t\t\t %v (%v)\n", fullVM.Name, fullVM.Self.Value)
+		fmt.Printf("Inventory Path: \t\t %v\n", thisVM.InventoryPath)
+		fmt.Printf("Status: \t\t\t %v\n", fullVM.OverallStatus)
+		fmt.Printf("Snapshot Support: \t\t %v\n",
+			fullVM.Capability.SnapshotOperationsSupported)
+		fmt.Printf("Guest Name: \t\t\t %v\n", fullVM.Config.GuestFullName)
+		fmt.Printf("Guest ID: \t\t\t %v\n", fullVM.Config.GuestId)
+		fmt.Printf("UUID: \t\t\t\t %v\n", fullVM.Config.Uuid)
+		fmt.Printf("CPUs: \t\t\t\t %v\n", fullVM.Config.Hardware.NumCPU)
+		fmt.Printf("Memory: \t\t\t %v\n", fullVM.Config.Hardware.MemoryMB)
+
+		for dsindex, dselement := range fullVM.Storage.PerDatastoreUsage {
+			fmt.Printf("Datastore %v Committed: \t\t %v\n",
+				dsindex,
+				dselement.Committed)
+			fmt.Printf("Datastore %v Uncommitted: \t %v\n",
+				dsindex,
+				dselement.Uncommitted)
+			fmt.Printf("Datastore %v Unshared: \t\t %v\n",
+				dsindex,
+				dselement.Unshared)
+		}
+
+		fmt.Printf("Host: \t\t\t\t %v\n", fullVM.Runtime.Host.Value)
+		fmt.Printf("PowerState: \t\t\t %v\n", fullVM.Runtime.PowerState)
+
+	}
+
+}
+
+//
+// vmInfoResult:
+//  Type used by property collector to return results
+//
+type vmInfoResult struct {
+	VMs     []mo.VirtualMachine
+	objects []*object.VirtualMachine
+}
+
+//
+// getFolderFromRef:
+//  Given a ManagedObjectReference for a folder, return the actual
+//  corresponding ManagedObject
+//
 func getFolderFromRef(ctx context.Context,
 	myClient *govmomi.Client,
 	myRef types.ManagedObjectReference) (mo.Folder, error) {
